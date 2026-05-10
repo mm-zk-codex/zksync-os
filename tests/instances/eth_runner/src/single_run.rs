@@ -218,7 +218,12 @@ pub fn eth_run(block_dir: String) -> anyhow::Result<()> {
 
     chain.set_last_block_number(block.result.number() - 1);
 
-    let header = block.result.header.clone().into();
+    let header: alloy::consensus::Header = block.result.header.clone().into();
+    let mut target_header_encoding = vec![];
+    header.encode(&mut target_header_encoding);
+    let target_header_hash = alloy::primitives::keccak256(&target_header_encoding);
+    println!("target_header_hash={target_header_hash}");
+
     let withdrawals_encoding = if let Some(withdrawals) = block.result.withdrawals.clone() {
         let mut buff = vec![];
         withdrawals.encode(&mut buff);
@@ -228,6 +233,16 @@ pub fn eth_run(block_dir: String) -> anyhow::Result<()> {
         Vec::new()
     };
 
-    let _ = chain.run_eth_block(transactions, witness, header, withdrawals_encoding);
+    let (result_keeper, _) = chain.run_eth_block_with_options(
+        transactions,
+        witness,
+        header,
+        withdrawals_encoding,
+        Some("eth_stf".to_string()),
+        true,
+    );
+    let result_keeper = result_keeper.expect("forward run must produce a result");
+    println!("eth_stf_forward_ok=true");
+    println!("sealed_header={:?}", result_keeper.block_header);
     Ok(())
 }
